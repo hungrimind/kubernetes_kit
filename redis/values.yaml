@@ -1,0 +1,25 @@
+architecture: standalone
+
+# Disable authentication since it's only accessed within the cluster
+auth:
+  enabled: false
+
+master:
+  persistence:
+    enabled: true
+    size: 8Gi
+  
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+replica:
+  resources:
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi

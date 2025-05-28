@@ -1,0 +1,48 @@
+name: Deploy Redis
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubectl
+        run: |
+          export KUBE_HOST="${{ secrets.KUBE_HOST }}"
+          export KUBE_CERTIFICATE="${{ secrets.KUBE_CERTIFICATE }}"
+          export KUBE_TOKEN="${{ secrets.KUBE_TOKEN }}"
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CERTIFICATE" | base64 -d > $HOME/.kube/certificate
+          kubectl config set-cluster default --server=https://$KUBE_HOST --certificate-authority=$HOME/.kube/certificate > /dev/null
+          kubectl config set-credentials cluster-admin --token="${KUBE_TOKEN}" > /dev/null
+          kubectl config set-context default --cluster=default --user=cluster-admin > /dev/null
+          kubectl config use-context default > /dev/null
+
+      - name: Add Bitnami Helm repository
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
+
+      - name: Deploy Redis
+        run: |
+          cd redis && \
+          helm upgrade --install redis bitnami/redis \
+            --namespace redis \
+            --create-namespace \
+            --values ./values.yaml \
+            --wait 

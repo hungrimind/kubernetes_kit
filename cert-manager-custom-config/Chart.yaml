@@ -1,0 +1,4 @@
+apiVersion: v2
+name: cert-manager-custom-config
+description: Custom configuration for cert-manager like ClusterIssuers.
+version: 0.1.0

@@ -1,0 +1,2 @@
+grafana:
+  host: {{grafana-host}} # URL of the Grafana instance (e.g. https://grafana.example.com)

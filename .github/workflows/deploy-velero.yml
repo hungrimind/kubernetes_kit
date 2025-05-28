@@ -1,0 +1,59 @@
+name: Deploy Velero
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubectl
+        run: |
+          export KUBE_HOST="${{ secrets.KUBE_HOST }}"
+          export KUBE_CERTIFICATE="${{ secrets.KUBE_CERTIFICATE }}"
+          export KUBE_TOKEN="${{ secrets.KUBE_TOKEN }}"
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CERTIFICATE" | base64 -d > $HOME/.kube/certificate
+          kubectl config set-cluster default --server=https://$KUBE_HOST --certificate-authority=$HOME/.kube/certificate > /dev/null
+          kubectl config set-credentials cluster-admin --token="${KUBE_TOKEN}" > /dev/null
+          kubectl config set-context default --cluster=default --user=cluster-admin > /dev/null
+          kubectl config use-context default > /dev/null
+
+      - name: Create Velero credentials
+        run: |
+          kubectl create namespace velero --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic velero-credentials \
+            --namespace velero \
+            --from-literal=cloud="\
+            [default]
+            aws_access_key_id=${{ secrets.AWS_VELERO_ACCESS_KEY }}
+            aws_secret_access_key=${{ secrets.AWS_VELERO_SECRET_ACCESS_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Add Velero Helm repository
+        run: |
+          helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy Velero
+        run: |
+          cd velero && \
+          helm upgrade --install velero vmware-tanzu/velero \
+            --namespace velero \
+            --create-namespace \
+            --values ./values.yaml \
+            --wait 

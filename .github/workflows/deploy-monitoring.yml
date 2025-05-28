@@ -1,0 +1,88 @@
+name: Deploy Monitoring Stack
+
+on:
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Configure kubectl
+        run: |
+          export KUBE_HOST="${{ secrets.KUBE_HOST }}"
+          export KUBE_CERTIFICATE="${{ secrets.KUBE_CERTIFICATE }}"
+          export KUBE_TOKEN="${{ secrets.KUBE_TOKEN }}"
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CERTIFICATE" | base64 -d > $HOME/.kube/certificate
+          kubectl config set-cluster default --server=https://$KUBE_HOST --certificate-authority=$HOME/.kube/certificate > /dev/null
+          kubectl config set-credentials cluster-admin --token="${KUBE_TOKEN}" > /dev/null
+          kubectl config set-context default --cluster=default --user=cluster-admin > /dev/null
+          kubectl config use-context default > /dev/null
+
+      - name: Create Grafana Admin Secret
+        run: |
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic grafana-admin-secret \
+            --namespace monitoring \
+            --from-literal=GF_SECURITY_ADMIN_USER=${{ secrets.GF_SECURITY_ADMIN_USER }} \
+            --from-literal=GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_SECURITY_ADMIN_PASSWORD }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add fluent https://fluent.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy Prometheus Stack
+        run: |
+          cd monitoring && \
+          helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --create-namespace \
+            --values ./values-kube-prometheus.yaml \
+            --debug \
+            --wait
+
+      - name: Deploy Loki
+        run: |
+          cd monitoring && \
+          helm upgrade --install loki grafana/loki \
+            --namespace monitoring \
+            --values ./values-loki.yaml \
+            --timeout 15m \
+            --debug \
+            --wait
+
+      - name: Deploy Fluent Bit
+        run: |
+          cd monitoring && \
+          helm upgrade --install fluent-bit fluent/fluent-bit \
+            --namespace monitoring \
+            --values ./fluent-bit-values.yaml \
+            --debug \
+            --wait
+
+      - name: Deploy Monitoring Chart
+        run: |
+          cd monitoring && \
+          helm upgrade --install monitoring-config . \
+            --namespace monitoring \
+            --values ./values.yaml \
+            --debug \
+            --wait

@@ -1,0 +1,100 @@
+name: Velero Backup & Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Select operation'
+        required: true
+        type: choice
+        options:
+          - create-backup
+          - restore-from-backup
+      backup_name:
+        description: 'Backup name (format: backup-YYYYMMDD)'
+        required: true
+        default: backup-$(date +%Y%m%d)
+
+jobs:
+  velero-ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure kubectl
+        run: |
+          export KUBE_HOST="${{ secrets.KUBE_HOST }}"
+          export KUBE_CERTIFICATE="${{ secrets.KUBE_CERTIFICATE }}"
+          export KUBE_TOKEN="${{ secrets.KUBE_TOKEN }}"
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CERTIFICATE" | base64 -d > $HOME/.kube/certificate
+          kubectl config set-cluster default --server=https://$KUBE_HOST --certificate-authority=$HOME/.kube/certificate > /dev/null
+          kubectl config set-credentials cluster-admin --token="${KUBE_TOKEN}" > /dev/null
+          kubectl config set-context default --cluster=default --user=cluster-admin > /dev/null
+          kubectl config use-context default > /dev/null
+
+      - name: Create Backup
+        if: github.event.inputs.operation == 'create-backup'
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: velero.io/v1
+          kind: Backup
+          metadata:
+            name: ${{ github.event.inputs.backup_name }}
+            namespace: velero
+          spec:
+            includedNamespaces:
+              - monitoring
+            storageLocation: default
+          EOF
+          
+          echo "Waiting for backup to complete..."
+          # Check backup status in a loop
+          for i in {1..30}; do
+            STATUS=$(kubectl get backup ${{ github.event.inputs.backup_name }} -n velero -o jsonpath='{.status.phase}')
+            if [ "$STATUS" = "Completed" ]; then
+              echo "Backup completed successfully!"
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "PartiallyFailed" ]; then
+              echo "Backup failed!"
+              kubectl describe backup ${{ github.event.inputs.backup_name }} -n velero
+              exit 1
+            fi
+            echo "Backup status: $STATUS - waiting..."
+            sleep 10
+          done
+          
+          echo "Backup details:"
+          kubectl describe backup ${{ github.event.inputs.backup_name }} -n velero
+
+      - name: Restore from Backup
+        if: github.event.inputs.operation == 'restore-from-backup'
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: velero.io/v1
+          kind: Restore
+          metadata:
+            name: restore-${{ github.event.inputs.backup_name }}
+            namespace: velero
+          spec:
+            backupName: ${{ github.event.inputs.backup_name }}
+            includedNamespaces:
+              - monitoring
+          EOF
+          
+          echo "Waiting for restore to complete..."
+          # Check restore status in a loop
+          for i in {1..30}; do
+            STATUS=$(kubectl get restore restore-${{ github.event.inputs.backup_name }} -n velero -o jsonpath='{.status.phase}')
+            if [ "$STATUS" = "Completed" ]; then
+              echo "Restore completed successfully!"
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "PartiallyFailed" ]; then
+              echo "Restore failed!"
+              kubectl describe restore restore-${{ github.event.inputs.backup_name }} -n velero
+              exit 1
+            fi
+            echo "Restore status: $STATUS - waiting..."
+            sleep 10
+          done
+          
+          echo "Restore details:"
+          kubectl describe restore restore-${{ github.event.inputs.backup_name }} -n velero 

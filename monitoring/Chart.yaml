@@ -1,0 +1,4 @@
+apiVersion: v2
+name: monitoring
+description: Monitoring stack for Kubernetes
+version: 0.1.0

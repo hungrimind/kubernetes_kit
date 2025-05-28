@@ -1,0 +1,3 @@
+addresspool:
+  addresses:
+    - {{metal-lb-server-ip}}/32 # IP address of your server 

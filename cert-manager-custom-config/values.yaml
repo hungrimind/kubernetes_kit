@@ -1,0 +1,5 @@
+clusterissuers:
+  prod:
+    email: {{cert-prod-email}} # PROD: email address for the cluster issuer (e.g. admin@example.com)
+  staging:
+    email: {{cert-staging-email}} # STAGING: email address for the cluster issuer (e.g. admin@example.com)

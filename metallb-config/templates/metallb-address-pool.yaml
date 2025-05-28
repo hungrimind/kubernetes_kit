@@ -1,0 +1,12 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ip-pool
+spec:
+  {{- if .Values.addresspool.addresses }}
+    {{- print "addresses:" | nindent 2 }}
+    {{- range $_, $a := .Values.addresspool.addresses }}
+      - {{ $a }}
+    {{- end }}
+  {{- end }}
+                                                

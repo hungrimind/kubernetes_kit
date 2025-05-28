@@ -1,0 +1,43 @@
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: {{velero-s3-bucket}} # s3 bucket name for backups
+      config:
+        region: eu-north-1
+      validationFrequency: 24h
+      accessMode: ReadWrite
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: eu-north-1
+
+  # These are server-level settings passed as CLI flags to the `velero server` command.
+  backupSyncPeriod: 24h
+  storeValidationFrequency: 24h
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.8.0
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+credentials:
+  useSecret: true
+  existingSecret: velero-credentials
+
+schedules:
+  daily-backup:
+    schedule: "0 1 * * *"
+    template:
+      includedNamespaces:
+      - monitoring
+      ttl: "168h"
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack

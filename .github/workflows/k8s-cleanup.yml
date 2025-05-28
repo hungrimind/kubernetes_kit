@@ -1,0 +1,64 @@
+name: Kubernetes Cluster Cleanup
+
+on:
+  schedule:
+    # Run weekly on Sunday at 2:00 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (show what would be deleted without deleting)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubectl
+        run: |
+          export KUBE_HOST="${{ secrets.KUBE_HOST }}"
+          export KUBE_CERTIFICATE="${{ secrets.KUBE_CERTIFICATE }}"
+          export KUBE_TOKEN="${{ secrets.KUBE_TOKEN }}"
+          mkdir -p $HOME/.kube
+          echo "$KUBE_CERTIFICATE" | base64 -d > $HOME/.kube/certificate
+          kubectl config set-cluster default --server=https://$KUBE_HOST --certificate-authority=$HOME/.kube/certificate > /dev/null
+          kubectl config set-credentials cluster-admin --token="${KUBE_TOKEN}" > /dev/null
+          kubectl config set-context default --cluster=default --user=cluster-admin > /dev/null
+          kubectl config use-context default > /dev/null
+
+      - name: Run disk usage check before cleanup
+        run: |
+          echo "Running disk usage check before cleanup..."
+          NODE_NAME=$(kubectl get nodes --no-headers -o custom-columns=":metadata.name")
+          kubectl debug node/$NODE_NAME --profile=general --image=busybox -- df -h /var
+
+      - name: Clean up unused container images
+        run: |
+          NODE_NAME=$(kubectl get nodes --no-headers -o custom-columns=":metadata.name")
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            echo "DRY RUN: Would clean up unused container images"
+            kubectl debug node/$NODE_NAME --profile=general --image=busybox -- crictl images
+          else
+            echo "Cleaning up unused container images..."
+            kubectl debug node/$NODE_NAME --profile=general --image=busybox -- crictl rmi --prune
+          fi
+
+      - name: Run disk usage check after cleanup
+        run: |
+          echo "Running disk usage check after cleanup..."
+          NODE_NAME=$(kubectl get nodes --no-headers -o custom-columns=":metadata.name")
+          kubectl debug node/$NODE_NAME --profile=general --image=busybox -- df -h /var
