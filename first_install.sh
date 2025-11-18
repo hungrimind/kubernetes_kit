@@ -40,12 +40,18 @@ echo "Starting installation for $ENVIRONMENT..."
 echo ""
 
 if [ "$ENVIRONMENT" = "k3s" ]; then
-    echo "Installing Helm..."
-    curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-    sudo apt-get update
-    sudo apt-get upgrade
-    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg helm
+	echo "Installing Helm (using official Buildkite repository)..."
+
+	# Download and install the current GPG signing key
+	# Note: The 'curl' package must be installed for this to work.
+	curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+
+	# Add the new Helm repository line
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+	# Update package lists and install Helm
+	sudo apt-get update
+	sudo apt-get install -y apt-transport-https ca-certificates curl gnupg helm
 
     echo "Installing k3s..."
     curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=servicelb,traefik" sh -s -
