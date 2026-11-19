@@ -11,6 +11,7 @@ The Kubernetes Kit is designed for developers and teams who want to own their in
 
 *   **🚀 Pre-configured Manifests:** A comprehensive set of YAML templates for common Kubernetes resources (Deployments, Services, Ingress, ConfigMaps, Secrets, etc.) to speed up your development.
 *   **💻 CLI:** Our [command line tool](https://github.com/hungrimind/hungrimind-cli) that creates your infrastructure folder, fills in the required values, and adds new apps.
+*   **📚 Documentation:** Guides for every part of the kit in [`docs/`](docs/README.md).
 
 ## Getting Started
 
@@ -47,6 +48,10 @@ Other commands, run from inside your infrastructure folder:
 To add an app without the CLI, copy the templates from
 [`templates/kubernetes/app`](https://github.com/hungrimind/hungrimind-cli/tree/main/templates/kubernetes/app)
 in the CLI repo and replace their placeholders by hand.
+
+## Documentation
+
+The full documentation lives in [`docs/`](docs/README.md). New to the kit? Start with the [guided tour](docs/get-started/guided-tour-local.md).
 
 ## Guiding Principles
 
