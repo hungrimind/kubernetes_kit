@@ -1,5 +1,8 @@
 # Kubernetes Kit
 
+> **Hungrimind has shut down.** This kit is now free and open to everyone. It is
+> no longer actively maintained, but you are welcome to use it, fork it, and build on it.
+
 ## Overview
 
 The Kubernetes Kit is designed for developers and teams who want to own their infrastructure and are looking for low-cost, yet highly scalable, Kubernetes solutions. This kit empowers you to build and manage your deployments with full control and transparency, providing a solid foundation that balances cost-effectiveness with the ability to grow.
@@ -7,8 +10,43 @@ The Kubernetes Kit is designed for developers and teams who want to own their in
 ## What's Included
 
 *   **🚀 Pre-configured Manifests:** A comprehensive set of YAML templates for common Kubernetes resources (Deployments, Services, Ingress, ConfigMaps, Secrets, etc.) to speed up your development.
-*   **📚 Documentation:** Step-by-step guides to help you use, customize, and expand the kit to fit your project's specific needs.
-*   **💬 Support:** We use GitHub Issues to collect all feedback about the kit, documentation, and anything related. Please open an issue if you have any questions or feedback.
+*   **💻 CLI:** Our [command line tool](https://github.com/hungrimind/hungrimind-cli) that creates your infrastructure folder, fills in the required values, and adds new apps.
+
+## Getting Started
+
+You need Node.js 18+ for the CLI, and a server you can SSH into for the cluster.
+
+### With the CLI (recommended)
+
+```bash
+npm install -g github:hungrimind/hungrimind-cli
+hungrimind kubernetes create my_infrastructure
+```
+
+The CLI downloads this kit into `my_infrastructure/`, asks you for every required
+`{{placeholder}}` value in the `values` files (each one has a comment explaining
+what it is for), and then offers to run `first_install.sh`, which installs the
+preconfigured apps on your cluster.
+
+Other commands, run from inside your infrastructure folder:
+
+| Command | What it does |
+| --- | --- |
+| `hungrimind kubernetes configure` | Fill in any placeholders you skipped |
+| `hungrimind kubernetes install` | Run `first_install.sh` (checks required values first) |
+| `hungrimind kubernetes add app` | Create a Helm chart and GitHub Actions workflow for a new app |
+
+### Without the CLI
+
+1. Clone or download this repo.
+2. Search the repo for `{{` and replace every placeholder (for example
+   `{{metal-lb-server-ip}}`, `{{cert-staging-email}}`, `{{cert-prod-email}}`)
+   with your own value. Each one has a comment explaining what it is for.
+3. On your server, run `./first_install.sh`.
+
+To add an app without the CLI, copy the templates from
+[`templates/kubernetes/app`](https://github.com/hungrimind/hungrimind-cli/tree/main/templates/kubernetes/app)
+in the CLI repo and replace their placeholders by hand.
 
 ## Guiding Principles
 
